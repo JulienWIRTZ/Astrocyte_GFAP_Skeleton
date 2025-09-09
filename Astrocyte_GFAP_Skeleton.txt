@@ -1,0 +1,79 @@
+Astrocyte_GFAP_Skeleton
+
+Overview
+Single-plane Fiji/ImageJ macro for GFAP (initially in hippocampal ROIs but can be used for any ROIs). 
+It calibrates pixels, selects the GFAP channel, preprocesses, segments to a binary mask, skeletonizes + prunes,
+count endpoints/junctions, measures ength and densities, derives mean GFAP thickness, and exports per-ROI CSV + QC PNG overlays.
+
+Inputs
+Image: 1 field, multi-channel or RGB; single z (2D)
+ROIset.zip: ROIs previously drawn and saved, any name can be used.
+Output directory: up to you :)
+
+Adjustable parameters (by stage) (this step is crucial for good results)
+1/Calibration
+pixel width (µm/px) default : 0.345
+pixel height (µm/px) default : 0.345
+unit default: micron
+This is used to convert pixels in micrometers for all metrics.
+
+2/Channel selection
+Split channels; you pick the GFAP window from a list (auto-prefers "red")
+If you already have a single GFAP channel, it's renamed GFAP_raw
+
+3/Preprocessing (intensity preserved in 16-bit)
+-rolling for Substract Background default = 50 (px)
+Range 20-100; increase it will remove broad background; too high can eat real signal
+-Gaussian blur sigma default = 0.8 (px)
+Range 0.5-1.2; small denoise before thresholding
+
+4/Segmentation --> binary GFAP_mask (8-bit)
+Choose in a dialog:
+- method = Otsu (global), Triangle (global), Phansalkar (local)
+- Phansalkar radius default = 15 (px)
+Range 12-25 (increase it to strict and refine halo)
+- others method can be add in the list and choose
+
+5/Measurements & derived metrics (per ROI)
+-Area µm² from ROI pixel count
+-GFAP%Area: fraction of mask pixels inside ROI x 100
+-GFAPMean16 / GFAP IntDen16: mean / integrated intesity on the 16-bit preprocessed image
+-Skel_Length µm: non-zero skeleton pixels x pw
+-Skel_Length density mm per mm²: length_µm/1000/Area_mm² (true unit: mm/mm² or mm-1)
+-Skel_Endpoints / Skel_Junctions: degree 1 /degree >3 nodes (8-connected); endpoints within the range from edges are excluded
+-Skel Endpoints per mm², Skel_Junctions per mm²: counts / area (mm²)
+-Skel_Tips per mm: endpoints / length (in mm)
+-Skel branches per mm: junctions / length (in mm)
+-GFAP Mean thickness µm: GFAP positive Area in µm² / skeleton length in µm --> average fiber thickness
+
+6/Validity filters (optionnal but recommended)
+Mark length normalized metrics as NA if very little signal:
+-minLen_um suggestion: 300-500 µm
+-minPct (GFAP_%Area) suggestion: 0.3-0.5%
+-or minLenDensity suggestion; 1mm-1
+This can avoids unstable ratios when length is close to 0.
+
+7/ QC overlays
+Base: GFAP_pre16 duplicated, Enhance Contrast (saturated about 0.35), convert to 8-bit
+Merge: QC_mask (red) + QC_base (green) --> RGB
+ROI contour: color yellow, Line widthdefault: 2
+You can save it as PNG file where you need it.
+
+HOW TO TUNE FOR DIFFERENT IMAGES
+-Low-signal images: prefer Phansalkar (radius 18-25; consider parameter_1 (k) about 0.20-0.35 if exposed), or Otsu + positive offset.
+Keep mina area and pruning >2 µm.
+-Halo/over-segmentation: increase Phansalkar radius, add Open, raise min area, or raise Otsu offset.
+-Over-pruning (loss of very thin branches): lower spurMin_um (1-1.15 µm)
+-Too many border tips: raise border_um to 2-3 µm.
+
+Assumptions/Limitations
+-2D single plane (no z-stack)
+-Isotropic XY pixels (if not, length uses pw, area uses pw*ph, so still OK).
+-Same acquisition and segmentation settings accross groups for fair comparisons.
+
+Troubleshooting quickies
+-"Window not found": naming is standardized (GFAP_mask, SKEL_tmp, SKEL_PRUED); ensure steps were not skipped.
+-Zeros/huge ratios: enable validity filters (min length/%area)
+-Crazy thickness: likely halo or vessels-tighten threshold or raise min area.
+
+Have a nice work :)
